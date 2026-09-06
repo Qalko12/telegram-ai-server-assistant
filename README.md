@@ -25,7 +25,12 @@ Python 3.12+ · aiogram 3.x · Claude API (Anthropic SDK) · asyncio · Docker �
 
 Разработка идёт поэтапно (15 фаз, от bootstrap до полной упаковки) — подробности в [плане](./docs/PLAN.md).
 
-**Готово (Фаза 0 — bootstrap):** конфигурация из `.env`, схема БД (8 таблиц) на SQLAlchemy + Alembic-миграции, Telegram-бот на aiogram с проверкой доступа по `ALLOWED_TELEGRAM_IDS`. Подключение Claude AI — следующий этап.
+**Готово:**
+- Фаза 0 (bootstrap) — конфигурация из `.env`, схема БД (8 таблиц) на SQLAlchemy + Alembic-миграции, Telegram-бот на aiogram с проверкой доступа по `ALLOWED_TELEGRAM_IDS`.
+- Фаза 1 (security-скелет) — уровни действий (SAFE/MODERATE/CRITICAL), deny-list на деструктивные команды, проверка `ALLOWED_PATHS` с защитой от path traversal, одноразовые confirmation-кнопки с TTL и защитой от гонки, audit log каждого решения.
+- Фаза 2 (AI-ядро) — подключён Claude API с tool calling, реестр инструментов на Pydantic-схемах, agent loop (лимит итераций, автоматическая защита от prompt injection через `<untrusted_tool_output>`), первые два SAFE-инструмента (`get_uptime`, `get_cpu_usage`), кратковременная память диалога в БД. MODERATE/CRITICAL-инструменты внутри диалога с ИИ пока не подключены к подтверждениям — это Фаза 3b.
+
+Docker и полноценная диагностика сервера — следующий этап.
 
 ### Установка и запуск (текущий этап)
 
