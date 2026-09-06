@@ -1,13 +1,26 @@
+import sys
+
 import pytest
 
 from app.config import settings
 from security.permissions import PathNotAllowedError
-from server.files import FileTooLargeError, NotAFileError, find_file, list_directory, read_file
+from server.files import (
+    FileTooLargeError,
+    NotAFileError,
+    ValidationFailedError,
+    create_directory,
+    delete_file,
+    find_file,
+    list_directory,
+    read_file,
+    write_file,
+)
 
 
 @pytest.fixture(autouse=True)
 def _set_allowed_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "allowed_paths_raw", str(tmp_path))
+    monkeypatch.setattr(settings, "backup_dir", str(tmp_path / "_backups"))
     return tmp_path
 
 
@@ -62,3 +75,68 @@ def test_read_file_rejects_too_large_file(tmp_path, monkeypatch) -> None:
 
     with pytest.raises(FileTooLargeError):
         read_file(str(target))
+
+
+async def test_write_file_creates_new_file_without_backup(tmp_path) -> None:
+    target = tmp_path / "new.txt"
+
+    result = await write_file(str(target), "hello")
+
+    assert target.read_text() == "hello"
+    assert "не требовался" in result
+
+
+async def test_write_file_backs_up_existing_file(tmp_path) -> None:
+    target = tmp_path / "config.txt"
+    target.write_text("old content")
+
+    await write_file(str(target), "new content")
+
+    assert target.read_text() == "new content"
+    backups = list((tmp_path / "_backups").glob("config.txt.*.bak"))
+    assert len(backups) == 1
+    assert backups[0].read_text() == "old content"
+
+
+async def test_write_file_rolls_back_on_failed_validation(tmp_path) -> None:
+    target = tmp_path / "config.txt"
+    target.write_text("old content")
+
+    with pytest.raises(ValidationFailedError):
+        await write_file(str(target), "broken content", validate_command=[sys.executable, "-c", "import sys; sys.exit(1)"])
+
+    assert target.read_text() == "old content"
+
+
+async def test_write_file_keeps_change_on_successful_validation(tmp_path) -> None:
+    target = tmp_path / "config.txt"
+    target.write_text("old content")
+
+    await write_file(str(target), "new content", validate_command=[sys.executable, "-c", "import sys; sys.exit(0)"])
+
+    assert target.read_text() == "new content"
+
+
+def test_delete_file_backs_up_before_removing(tmp_path) -> None:
+    target = tmp_path / "todelete.txt"
+    target.write_text("bye")
+
+    delete_file(str(target))
+
+    assert not target.exists()
+    backups = list((tmp_path / "_backups").glob("todelete.txt.*.bak"))
+    assert len(backups) == 1
+    assert backups[0].read_text() == "bye"
+
+
+def test_delete_file_missing_raises(tmp_path) -> None:
+    with pytest.raises(FileNotFoundError):
+        delete_file(str(tmp_path / "does_not_exist.txt"))
+
+
+def test_create_directory_creates_nested_path(tmp_path) -> None:
+    target = tmp_path / "a" / "b" / "c"
+
+    create_directory(str(target))
+
+    assert target.is_dir()

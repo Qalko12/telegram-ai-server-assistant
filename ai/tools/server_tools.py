@@ -4,9 +4,10 @@ from pydantic import BaseModel, Field
 
 from ai.tools.registry import ExecutionContext, ToolSpec
 from security.levels import SecurityLevel
+from security.validator import validate_command
 from server.diagnostics import full_server_diagnostic
-from server.executor import CommandResult
-from server.files import find_file, list_directory, read_file
+from server.executor import CommandExecutor, CommandResult
+from server.files import create_directory, delete_file, find_file, list_directory, read_file, write_file
 from server.logs import get_system_logs, search_logs
 from server.services import get_service_logs, get_service_status, restart_service, start_service, stop_service
 from server.system import (
@@ -105,6 +106,31 @@ class FullServerDiagnosticParams(_NoParams):
 
 class ServiceControlParams(BaseModel):
     service: str = Field(description="Имя systemd-сервиса, например nginx.")
+
+
+class WriteFileParams(BaseModel):
+    path: str
+    content: str
+    validate_command: list[str] | None = Field(
+        default=None, description="Опциональная команда для проверки файла после записи, например ['nginx', '-t']."
+    )
+
+
+class DeleteFileParams(BaseModel):
+    path: str
+
+
+class CreateDirectoryParams(BaseModel):
+    path: str
+
+
+class ExecuteCommandParams(BaseModel):
+    program: str = Field(description="Исполняемый файл без shell-интерпретации, например 'ls'.")
+    args: list[str] = Field(default_factory=list)
+
+
+class ExecuteShellParams(BaseModel):
+    command: str = Field(description="Полная shell-команда (с пайпами/редиректами). Требует явного подтверждения.")
 
 
 async def handle_get_uptime(params: GetUptimeParams, ctx: ExecutionContext) -> str:
@@ -214,6 +240,30 @@ async def handle_stop_service(params: ServiceControlParams, ctx: ExecutionContex
 
 async def handle_restart_service(params: ServiceControlParams, ctx: ExecutionContext) -> str:
     return _format_command_result(await restart_service(params.service))
+
+
+async def handle_write_file(params: WriteFileParams, ctx: ExecutionContext) -> str:
+    return await write_file(params.path, params.content, params.validate_command)
+
+
+async def handle_delete_file(params: DeleteFileParams, ctx: ExecutionContext) -> str:
+    return delete_file(params.path)
+
+
+async def handle_create_directory(params: CreateDirectoryParams, ctx: ExecutionContext) -> str:
+    return create_directory(params.path)
+
+
+async def handle_execute_command(params: ExecuteCommandParams, ctx: ExecutionContext) -> str:
+    validate_command(params.program, params.args)
+    result = await CommandExecutor().run(params.program, params.args)
+    return _format_command_result(result)
+
+
+async def handle_execute_shell(params: ExecuteShellParams, ctx: ExecutionContext) -> str:
+    validate_command(params.command, [])
+    result = await CommandExecutor().run("/bin/sh", ["-c", params.command])
+    return _format_command_result(result)
 
 
 GET_UPTIME = ToolSpec(
@@ -369,4 +419,54 @@ RESTART_SERVICE = ToolSpec(
     input_model=ServiceControlParams,
     handler=handle_restart_service,
     security_level=SecurityLevel.MODERATE,
+)
+
+WRITE_FILE = ToolSpec(
+    name="write_file",
+    description=(
+        "Записать содержимое в файл (в пределах ALLOWED_PATHS). Существующий файл автоматически "
+        "бэкапится перед перезаписью. Можно указать validate_command (например ['nginx','-t']) — "
+        "при неудачной проверке изменение автоматически откатывается."
+    ),
+    input_model=WriteFileParams,
+    handler=handle_write_file,
+    security_level=SecurityLevel.MODERATE,
+)
+
+DELETE_FILE = ToolSpec(
+    name="delete_file",
+    description="Удалить файл (в пределах ALLOWED_PATHS). Перед удалением создаётся бэкап.",
+    input_model=DeleteFileParams,
+    handler=handle_delete_file,
+    security_level=SecurityLevel.MODERATE,
+)
+
+CREATE_DIRECTORY = ToolSpec(
+    name="create_directory",
+    description="Создать директорию (в пределах ALLOWED_PATHS).",
+    input_model=CreateDirectoryParams,
+    handler=handle_create_directory,
+    security_level=SecurityLevel.MODERATE,
+)
+
+EXECUTE_COMMAND = ToolSpec(
+    name="execute_command",
+    description=(
+        "Выполнить произвольную программу с аргументами (без shell-интерпретации). "
+        "Проверяется deny-list деструктивных команд даже после подтверждения."
+    ),
+    input_model=ExecuteCommandParams,
+    handler=handle_execute_command,
+    security_level=SecurityLevel.MODERATE,
+)
+
+EXECUTE_SHELL = ToolSpec(
+    name="execute_shell",
+    description=(
+        "Выполнить сырую shell-команду с пайпами/редиректами. Самый опасный инструмент — "
+        "всегда требует явного подтверждения, плюс deny-list."
+    ),
+    input_model=ExecuteShellParams,
+    handler=handle_execute_shell,
+    security_level=SecurityLevel.CRITICAL,
 )

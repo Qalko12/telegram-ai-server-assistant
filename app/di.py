@@ -11,6 +11,10 @@ from ai.tools.docker_tools import (
 )
 from ai.tools.registry import ToolRegistry
 from ai.tools.server_tools import (
+    CREATE_DIRECTORY,
+    DELETE_FILE,
+    EXECUTE_COMMAND,
+    EXECUTE_SHELL,
     FIND_FILE,
     FULL_SERVER_DIAGNOSTIC,
     GET_CPU_USAGE,
@@ -30,6 +34,7 @@ from ai.tools.server_tools import (
     SEARCH_LOGS,
     START_SERVICE,
     STOP_SERVICE,
+    WRITE_FILE,
 )
 
 
@@ -64,6 +69,11 @@ def build_tool_registry() -> ToolRegistry:
         DOCKER_STOP,
         DOCKER_RESTART,
         DOCKER_EXEC,
+        WRITE_FILE,
+        DELETE_FILE,
+        CREATE_DIRECTORY,
+        EXECUTE_COMMAND,
+        EXECUTE_SHELL,
     ):
         registry.register(spec)
 

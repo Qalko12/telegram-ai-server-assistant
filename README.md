@@ -33,7 +33,9 @@ Python 3.12+ · aiogram 3.x · Claude API (Anthropic SDK) · asyncio · Docker �
 
 - Фаза 3b (Docker и управление сервисами) — agent loop теперь умеет ставить диалог на паузу: при вызове MODERATE/CRITICAL-инструмента бот шлёт inline-кнопки подтверждения, а после ответа пользователя возобновляет диалог с Claude с результатом (выполнено/отклонено). Добавлены `start/stop/restart_service`, `docker_ps/stats/logs/inspect` (SAFE), `docker_start/stop/restart` (MODERATE), `docker_exec` (CRITICAL, плюс deny-list на команду внутри контейнера). Итого 27 инструментов.
 
-Файлы с backup/rollback и execute_command (CRITICAL) — следующий этап.
+- Фаза 3c (файлы + execute) — `write_file`/`delete_file` с автоматическим бэкапом перед изменением (`write_file` умеет опциональную validate-команду с авто-откатом при провале), `create_directory`, `execute_command` (MODERATE, без shell) и `execute_shell` (CRITICAL, для пайпов/редиректов) — оба всегда проходят через deny-list, даже после подтверждения. Итого 32 инструмента.
+
+Vision/OCR и работа с документами — следующий этап.
 
 ### Установка и запуск (текущий этап)
 

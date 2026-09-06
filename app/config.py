@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     code_workspace: str = Field(default="/opt/ai-workspace", alias="CODE_WORKSPACE")
     allowed_paths_raw: str = Field(alias="ALLOWED_PATHS")
+    backup_dir: str = Field(default="/var/backups/ai-assistant", alias="BACKUP_DIR")
 
     voice_responses_enabled: bool = Field(default=False, alias="VOICE_RESPONSES_ENABLED")
     voice_response_mode: Literal["text", "voice", "auto"] = Field(default="auto", alias="VOICE_RESPONSE_MODE")
