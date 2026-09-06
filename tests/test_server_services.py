@@ -1,7 +1,15 @@
 import pytest
 
 from server.executor import CommandResult
-from server.services import InvalidServiceNameError, get_service_logs, get_service_status, validate_service_name
+from server.services import (
+    InvalidServiceNameError,
+    get_service_logs,
+    get_service_status,
+    restart_service,
+    start_service,
+    stop_service,
+    validate_service_name,
+)
 
 
 class _FakeExecutor:
@@ -50,3 +58,17 @@ async def test_get_service_logs_calls_journalctl_with_unit_and_lines() -> None:
 
     assert result.stdout == "log line"
     assert fake.calls == [("journalctl", ["-u", "nginx", "-n", "20", "--no-pager"])]
+
+
+async def test_start_stop_restart_service_call_systemctl() -> None:
+    fake = _FakeExecutor(CommandResult(exit_code=0, stdout="", stderr="", timed_out=False))
+
+    await start_service("nginx", executor=fake)
+    await stop_service("nginx", executor=fake)
+    await restart_service("nginx", executor=fake)
+
+    assert fake.calls == [
+        ("systemctl", ["start", "nginx"]),
+        ("systemctl", ["stop", "nginx"]),
+        ("systemctl", ["restart", "nginx"]),
+    ]

@@ -31,7 +31,9 @@ Python 3.12+ · aiogram 3.x · Claude API (Anthropic SDK) · asyncio · Docker �
 - Фаза 2 (AI-ядро) — подключён Claude API с tool calling, реестр инструментов на Pydantic-схемах, agent loop (лимит итераций, автоматическая защита от prompt injection через `<untrusted_tool_output>`), кратковременная память диалога в БД. MODERATE/CRITICAL-инструменты внутри диалога с ИИ пока не подключены к подтверждениям — это Фаза 3b.
 - Фаза 3a (диагностика сервера) — `CommandExecutor` (безопасный subprocess с таймаутом и защитой от переполнения памяти при большом выводе), 16 SAFE-инструментов: системная информация, CPU/RAM/диск/процессы/сеть, статус и логи systemd-сервисов, системные логи и поиск по ним, безопасное чтение файлов и директорий (в пределах `ALLOWED_PATHS`), и `full_server_diagnostic` — по запросу «проверь сервер» ИИ сам проводит полную диагностику без уточняющих вопросов.
 
-Docker и управление сервисами (MODERATE, с подтверждением) — следующий этап.
+- Фаза 3b (Docker и управление сервисами) — agent loop теперь умеет ставить диалог на паузу: при вызове MODERATE/CRITICAL-инструмента бот шлёт inline-кнопки подтверждения, а после ответа пользователя возобновляет диалог с Claude с результатом (выполнено/отклонено). Добавлены `start/stop/restart_service`, `docker_ps/stats/logs/inspect` (SAFE), `docker_start/stop/restart` (MODERATE), `docker_exec` (CRITICAL, плюс deny-list на команду внутри контейнера). Итого 27 инструментов.
+
+Файлы с backup/rollback и execute_command (CRITICAL) — следующий этап.
 
 ### Установка и запуск (текущий этап)
 

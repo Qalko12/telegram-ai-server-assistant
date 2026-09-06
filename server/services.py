@@ -25,3 +25,21 @@ async def get_service_logs(service: str, lines: int = 50, executor: CommandExecu
     validate_service_name(service)
     executor = executor or CommandExecutor()
     return await executor.run("journalctl", ["-u", service, "-n", str(lines), "--no-pager"])
+
+
+async def start_service(service: str, executor: CommandExecutor | None = None) -> CommandResult:
+    validate_service_name(service)
+    executor = executor or CommandExecutor()
+    return await executor.run("systemctl", ["start", service])
+
+
+async def stop_service(service: str, executor: CommandExecutor | None = None) -> CommandResult:
+    validate_service_name(service)
+    executor = executor or CommandExecutor()
+    return await executor.run("systemctl", ["stop", service])
+
+
+async def restart_service(service: str, executor: CommandExecutor | None = None) -> CommandResult:
+    validate_service_name(service)
+    executor = executor or CommandExecutor()
+    return await executor.run("systemctl", ["restart", service])

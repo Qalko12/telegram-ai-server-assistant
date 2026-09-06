@@ -8,7 +8,7 @@ from server.diagnostics import full_server_diagnostic
 from server.executor import CommandResult
 from server.files import find_file, list_directory, read_file
 from server.logs import get_system_logs, search_logs
-from server.services import get_service_logs, get_service_status
+from server.services import get_service_logs, get_service_status, restart_service, start_service, stop_service
 from server.system import (
     format_uptime,
     get_cpu_percent,
@@ -101,6 +101,10 @@ class ReadFileParams(BaseModel):
 
 class FullServerDiagnosticParams(_NoParams):
     pass
+
+
+class ServiceControlParams(BaseModel):
+    service: str = Field(description="Имя systemd-сервиса, например nginx.")
 
 
 async def handle_get_uptime(params: GetUptimeParams, ctx: ExecutionContext) -> str:
@@ -198,6 +202,18 @@ async def handle_read_file(params: ReadFileParams, ctx: ExecutionContext) -> str
 
 async def handle_full_server_diagnostic(params: FullServerDiagnosticParams, ctx: ExecutionContext) -> str:
     return await full_server_diagnostic()
+
+
+async def handle_start_service(params: ServiceControlParams, ctx: ExecutionContext) -> str:
+    return _format_command_result(await start_service(params.service))
+
+
+async def handle_stop_service(params: ServiceControlParams, ctx: ExecutionContext) -> str:
+    return _format_command_result(await stop_service(params.service))
+
+
+async def handle_restart_service(params: ServiceControlParams, ctx: ExecutionContext) -> str:
+    return _format_command_result(await restart_service(params.service))
 
 
 GET_UPTIME = ToolSpec(
@@ -329,4 +345,28 @@ FULL_SERVER_DIAGNOSTIC = ToolSpec(
     input_model=FullServerDiagnosticParams,
     handler=handle_full_server_diagnostic,
     security_level=SecurityLevel.SAFE,
+)
+
+START_SERVICE = ToolSpec(
+    name="start_service",
+    description="Запустить systemd-сервис. Требует подтверждения.",
+    input_model=ServiceControlParams,
+    handler=handle_start_service,
+    security_level=SecurityLevel.MODERATE,
+)
+
+STOP_SERVICE = ToolSpec(
+    name="stop_service",
+    description="Остановить systemd-сервис. Требует подтверждения.",
+    input_model=ServiceControlParams,
+    handler=handle_stop_service,
+    security_level=SecurityLevel.MODERATE,
+)
+
+RESTART_SERVICE = ToolSpec(
+    name="restart_service",
+    description="Перезапустить systemd-сервис. Требует подтверждения.",
+    input_model=ServiceControlParams,
+    handler=handle_restart_service,
+    security_level=SecurityLevel.MODERATE,
 )

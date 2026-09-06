@@ -1,5 +1,6 @@
 import logging
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 from ai.client import get_client
 from ai.prompts import SYSTEM_PROMPT, wrap_untrusted
@@ -13,55 +14,119 @@ MAX_AGENT_ITERATIONS = 15
 MAX_RESPONSE_TOKENS = 2048
 
 
+@dataclass
+class AgentFinalAnswer:
+    text: str
+    kind: Literal["final"] = "final"
+
+
+@dataclass
+class AgentConfirmationNeeded:
+    tool_use_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    reason: str
+    snapshot: list[dict[str, Any]]
+    pending_tool_results: list[dict[str, Any]] = field(default_factory=list)
+    kind: Literal["confirmation_needed"] = "confirmation_needed"
+
+
+AgentOutcome = AgentFinalAnswer | AgentConfirmationNeeded
+
+
 class AgentLoop:
     def __init__(self, registry: ToolRegistry) -> None:
-        self._registry = registry
+        self.registry = registry
 
-    async def run(self, messages: list[dict[str, Any]], ctx: ExecutionContext) -> str:
+    async def run(self, messages: list[dict[str, Any]], ctx: ExecutionContext) -> AgentOutcome:
+        return await self._loop(list(messages), ctx)
+
+    async def resume(
+        self,
+        pending: AgentConfirmationNeeded,
+        result_content: str,
+        *,
+        is_error: bool,
+        ctx: ExecutionContext,
+    ) -> AgentOutcome:
+        resolved_block = {
+            "type": "tool_result",
+            "tool_use_id": pending.tool_use_id,
+            "content": result_content,
+            "is_error": is_error,
+        }
+        conversation = list(pending.snapshot)
+        conversation.append({"role": "user", "content": [*pending.pending_tool_results, resolved_block]})
+        return await self._loop(conversation, ctx)
+
+    async def _loop(self, conversation: list[dict[str, Any]], ctx: ExecutionContext) -> AgentOutcome:
         client = get_client()
-        conversation = list(messages)
 
         for _ in range(MAX_AGENT_ITERATIONS):
             response = await client.messages.create(
                 model=settings.claude_model_main,
                 max_tokens=MAX_RESPONSE_TOKENS,
                 system=SYSTEM_PROMPT,
-                tools=self._registry.to_anthropic_tools(),
+                tools=self.registry.to_anthropic_tools(),
                 messages=conversation,
             )
 
-            conversation.append({"role": "assistant", "content": response.content})
+            assistant_blocks = [block.model_dump() for block in response.content]
+            conversation.append({"role": "assistant", "content": assistant_blocks})
 
             if response.stop_reason != "tool_use":
-                return _extract_text(response.content)
+                return AgentFinalAnswer(text=_extract_text(response.content))
 
-            tool_results = [await self._run_tool_block(block, ctx) for block in response.content if block.type == "tool_use"]
+            tool_results: list[dict[str, Any]] = []
+            pending: AgentConfirmationNeeded | None = None
+
+            for block in response.content:
+                if block.type != "tool_use":
+                    continue
+
+                spec = self.registry.get(block.name)
+
+                if spec is None:
+                    tool_results.append(_tool_error(block.id, f"Unknown tool: {block.name}"))
+                    continue
+
+                if spec.security_level != SecurityLevel.SAFE:
+                    if pending is None:
+                        pending = AgentConfirmationNeeded(
+                            tool_use_id=block.id,
+                            tool_name=block.name,
+                            arguments=block.input,
+                            reason=_extract_text(response.content) or f"Требуется выполнить '{block.name}'.",
+                            snapshot=list(conversation),
+                        )
+                    else:
+                        tool_results.append(
+                            _tool_error(
+                                block.id,
+                                "Another action in this turn already requires confirmation; only one "
+                                "pending confirmation is supported at a time. Wait for it to resolve first.",
+                            )
+                        )
+                    continue
+
+                try:
+                    params = spec.input_model.model_validate(block.input)
+                    result_text = await spec.handler(params, ctx)
+                except Exception as exc:
+                    logger.exception("Tool %s failed", block.name)
+                    tool_results.append(_tool_error(block.id, str(exc)))
+                    continue
+
+                wrapped = wrap_untrusted(block.name, result_text)
+                tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": wrapped})
+
+            if pending is not None:
+                pending.pending_tool_results = tool_results
+                return pending
+
             conversation.append({"role": "user", "content": tool_results})
 
-        return "Достигнут лимит итераций агента, не смог завершить задачу за отведённое число шагов."
-
-    async def _run_tool_block(self, block: Any, ctx: ExecutionContext) -> dict[str, Any]:
-        spec = self._registry.get(block.name)
-
-        if spec is None:
-            return _tool_error(block.id, f"Unknown tool: {block.name}")
-
-        if spec.security_level != SecurityLevel.SAFE:
-            return _tool_error(
-                block.id,
-                f"Tool '{block.name}' requires user confirmation (level={spec.security_level.value}), "
-                "which is not yet wired into this version of the agent loop.",
-            )
-
-        try:
-            params = spec.input_model.model_validate(block.input)
-            result_text = await spec.handler(params, ctx)
-        except Exception as exc:
-            logger.exception("Tool %s failed", block.name)
-            return _tool_error(block.id, str(exc))
-
-        wrapped = wrap_untrusted(block.name, result_text)
-        return {"type": "tool_result", "tool_use_id": block.id, "content": wrapped}
+        return AgentFinalAnswer(text="Достигнут лимит итераций агента, не смог завершить задачу за отведённое число шагов.")
 
 
 def _extract_text(content: list[Any]) -> str:

@@ -1,3 +1,14 @@
+from ai.agent_loop import AgentLoop
+from ai.tools.docker_tools import (
+    DOCKER_EXEC,
+    DOCKER_INSPECT,
+    DOCKER_LOGS,
+    DOCKER_PS,
+    DOCKER_RESTART,
+    DOCKER_START,
+    DOCKER_STATS,
+    DOCKER_STOP,
+)
 from ai.tools.registry import ToolRegistry
 from ai.tools.server_tools import (
     FIND_FILE,
@@ -15,7 +26,10 @@ from ai.tools.server_tools import (
     GET_UPTIME,
     LIST_DIRECTORY,
     READ_FILE,
+    RESTART_SERVICE,
     SEARCH_LOGS,
+    START_SERVICE,
+    STOP_SERVICE,
 )
 
 
@@ -39,7 +53,21 @@ def build_tool_registry() -> ToolRegistry:
         FIND_FILE,
         READ_FILE,
         FULL_SERVER_DIAGNOSTIC,
+        START_SERVICE,
+        STOP_SERVICE,
+        RESTART_SERVICE,
+        DOCKER_PS,
+        DOCKER_STATS,
+        DOCKER_LOGS,
+        DOCKER_INSPECT,
+        DOCKER_START,
+        DOCKER_STOP,
+        DOCKER_RESTART,
+        DOCKER_EXEC,
     ):
         registry.register(spec)
 
     return registry
+
+
+agent_loop = AgentLoop(build_tool_registry())

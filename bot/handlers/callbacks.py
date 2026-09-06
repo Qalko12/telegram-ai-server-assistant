@@ -6,7 +6,12 @@ from typing import Any
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
+from ai.agent_loop import AgentConfirmationNeeded
+from ai.prompts import wrap_untrusted
+from ai.tools.registry import ExecutionContext
+from app.di import agent_loop
 from audit.logger import AuditLogger
+from bot.agent_dispatch import deliver_outcome
 from database.engine import async_session_factory
 from security.confirmations import ConfirmationError, ConfirmationService
 
@@ -54,8 +59,14 @@ async def _resolve(callback: CallbackQuery, action_id: str, new_status: str) -> 
     if callback.message is not None:
         await callback.message.edit_reply_markup(reply_markup=None)
 
-    if new_status == "DENIED":
-        await callback.answer("Отменено.")
+    approved = new_status == "APPROVED"
+    await callback.answer("Подтверждено, выполняю..." if approved else "Отменено.")
+
+    if isinstance(confirmation.agent_session_snapshot, dict) and "snapshot" in confirmation.agent_session_snapshot:
+        await _resolve_agent_loop_confirmation(callback, confirmation, approved=approved)
+        return
+
+    if not approved:
         if callback.message is not None:
             await callback.message.answer("❌ Действие отменено.")
         await _audit(
@@ -66,8 +77,6 @@ async def _resolve(callback: CallbackQuery, action_id: str, new_status: str) -> 
             error="denied_by_user",
         )
         return
-
-    await callback.answer("Подтверждено, выполняю...")
 
     executor = _action_executors.get(confirmation.tool_name)
     if executor is None:
@@ -112,6 +121,79 @@ async def _resolve(callback: CallbackQuery, action_id: str, new_status: str) -> 
         result=result_text,
         execution_time_ms=(time.monotonic() - started_at) * 1000,
     )
+
+
+async def _resolve_agent_loop_confirmation(callback: CallbackQuery, confirmation: Any, *, approved: bool) -> None:
+    snap = confirmation.agent_session_snapshot
+    pending = AgentConfirmationNeeded(
+        tool_use_id=snap["tool_use_id"],
+        tool_name=confirmation.tool_name,
+        arguments=confirmation.arguments,
+        reason=confirmation.reason,
+        snapshot=snap["snapshot"],
+        pending_tool_results=snap["pending_tool_results"],
+    )
+    ctx = ExecutionContext(telegram_user_id=confirmation.telegram_user_id, chat_id=confirmation.chat_id)
+
+    started_at = time.monotonic()
+
+    if not approved:
+        outcome = await agent_loop.resume(pending, "Пользователь отклонил это действие.", is_error=True, ctx=ctx)
+        await _audit(
+            confirmation.telegram_user_id,
+            confirmation.tool_name,
+            confirmation.arguments,
+            success=False,
+            error="denied_by_user",
+            execution_time_ms=(time.monotonic() - started_at) * 1000,
+        )
+    else:
+        spec = agent_loop.registry.get(confirmation.tool_name)
+        if spec is None:
+            outcome = await agent_loop.resume(
+                pending, f"Unknown tool: {confirmation.tool_name}", is_error=True, ctx=ctx
+            )
+            await _audit(
+                confirmation.telegram_user_id,
+                confirmation.tool_name,
+                confirmation.arguments,
+                success=False,
+                error="unknown_tool",
+            )
+        else:
+            try:
+                params = spec.input_model.model_validate(confirmation.arguments)
+                result_text = await spec.handler(params, ctx)
+            except Exception as exc:
+                logger.exception("Tool %s failed after confirmation", confirmation.tool_name)
+                outcome = await agent_loop.resume(pending, str(exc), is_error=True, ctx=ctx)
+                await _audit(
+                    confirmation.telegram_user_id,
+                    confirmation.tool_name,
+                    confirmation.arguments,
+                    success=False,
+                    error=str(exc),
+                    execution_time_ms=(time.monotonic() - started_at) * 1000,
+                )
+            else:
+                wrapped = wrap_untrusted(confirmation.tool_name, result_text)
+                outcome = await agent_loop.resume(pending, wrapped, is_error=False, ctx=ctx)
+                await _audit(
+                    confirmation.telegram_user_id,
+                    confirmation.tool_name,
+                    confirmation.arguments,
+                    success=True,
+                    result=result_text,
+                    execution_time_ms=(time.monotonic() - started_at) * 1000,
+                )
+
+    if callback.message is not None:
+        await deliver_outcome(
+            outcome,
+            chat_id=confirmation.chat_id,
+            telegram_user_id=confirmation.telegram_user_id,
+            answer=callback.message.answer,
+        )
 
 
 async def _audit(
