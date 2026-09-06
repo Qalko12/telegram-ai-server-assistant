@@ -2,7 +2,7 @@
 
 Production-ready Telegram-бот на Python 3.12 + aiogram 3.x + Claude API (tool calling), который управляет VPS через обычный человеческий язык: диагностика Linux/Docker, работа с файлами и логами, мониторинг с алертами, а также самостоятельное создание, редактирование, тестирование и деплой проектов прямо на сервере.
 
-> Проект в разработке. Полное ТЗ — [`Текстовый документ.txt`](./Текстовый документ.txt), план реализации — [`tmp/plans/telegram-ai-assistant-plan.md`](./tmp/plans/telegram-ai-assistant-plan.md).
+> Проект в разработке. Полное техническое задание — [`Текстовый документ.txt`](./Текстовый документ.txt), план реализации — [`docs/PLAN.md`](./docs/PLAN.md).
 
 ## Возможности
 
@@ -23,7 +23,31 @@ Python 3.12+ · aiogram 3.x · Claude API (Anthropic SDK) · asyncio · Docker �
 
 ## Статус разработки
 
-Разработка идёт поэтапно (15 фаз, от bootstrap до полной упаковки) — подробности в [плане](./tmp/plans/telegram-ai-assistant-plan.md). Инструкции по установке и запуску появятся здесь по мере готовности первых фаз.
+Разработка идёт поэтапно (15 фаз, от bootstrap до полной упаковки) — подробности в [плане](./docs/PLAN.md).
+
+**Готово (Фаза 0 — bootstrap):** конфигурация из `.env`, схема БД (8 таблиц) на SQLAlchemy + Alembic-миграции, Telegram-бот на aiogram с проверкой доступа по `ALLOWED_TELEGRAM_IDS`. Подключение Claude AI — следующий этап.
+
+### Установка и запуск (текущий этап)
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux/macOS
+
+pip install -r requirements.txt
+
+cp .env.example .env            # заполнить TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY, ALLOWED_TELEGRAM_IDS
+
+alembic upgrade head            # создать БД
+python main.py                  # запустить бота
+```
+
+### Тесты
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
 ## Безопасность
 
