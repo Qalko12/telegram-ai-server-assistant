@@ -1,0 +1,31 @@
+services:
+  assistant:
+    build: .
+    container_name: telegram-ai-assistant
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # SQLite + данные бота (хранятся рядом с проектом на хосте)
+      - ./data:/app/data
+      # Управление Docker хоста
+      - /var/run/docker.sock:/var/run/docker.sock
+      # systemctl/journalctl против хоста (см. README, раздел «Управление systemd из контейнера»)
+      - /run/systemd/private:/run/systemd/private
+      - /run/log/journal:/run/log/journal:ro
+      - /var/log/journal:/var/log/journal:ro
+      # Файловые пути из ALLOWED_PATHS (Code Workspace живёт в /opt/ai-workspace на хосте)
+      - /opt:/opt
+      - /var/www:/var/www
+      # Бэкапы файлов, которые бот правит (BACKUP_DIR)
+      - /var/backups/ai-assistant:/var/backups/ai-assistant
+    # Лимиты самого бота: агент + sandbox-контейнеры делят память VPS
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      # Бот работает через long polling (без HTTP-порта): здоров = процесс жив
+      test: ["CMD-SHELL", "pgrep -f 'python main.py' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
