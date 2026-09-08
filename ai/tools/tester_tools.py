@@ -23,6 +23,7 @@ from coding.fix_guard import CodeFixGuard, FixLimitReachedError
 from coding.sandbox import SandboxImageMissingError, run_in_sandbox
 from coding.workspace import project_root, resolve_inside, set_project_status
 from security.levels import SecurityLevel
+from security.ratelimit import SANDBOX_RUNS, limiter
 
 # Один guard на процесс: счётчики живут между tool-вызовами в рамках цикла агента.
 fix_guard = CodeFixGuard()
@@ -57,8 +58,9 @@ class RunProjectParams(BaseModel):
     timeout_seconds: int = Field(default=60, ge=5, le=600)
 
 
-async def _run_task(project: str, task: str) -> str:
+async def _run_task(project: str, task: str, ctx: ExecutionContext) -> str:
     root = project_root(project)
+    await limiter.acquire("sandbox_runs", ctx.telegram_user_id, SANDBOX_RUNS)
     try:
         result = await tester.run_task(root, task)
     except SandboxImageMissingError as exc:
@@ -94,24 +96,25 @@ async def _run_task(project: str, task: str) -> str:
 
 
 async def handle_run_tests(params: ProjectTaskParams, ctx: ExecutionContext) -> str:
-    return await _run_task(params.project, "test")
+    return await _run_task(params.project, "test", ctx)
 
 
 async def handle_run_linter(params: ProjectTaskParams, ctx: ExecutionContext) -> str:
-    return await _run_task(params.project, "lint")
+    return await _run_task(params.project, "lint", ctx)
 
 
 async def handle_run_formatter(params: ProjectTaskParams, ctx: ExecutionContext) -> str:
-    return await _run_task(params.project, "format")
+    return await _run_task(params.project, "format", ctx)
 
 
 async def handle_run_build(params: ProjectTaskParams, ctx: ExecutionContext) -> str:
-    return await _run_task(params.project, "build")
+    return await _run_task(params.project, "build", ctx)
 
 
 async def handle_install_dependency(params: InstallDependencyParams, ctx: ExecutionContext) -> str:
     root = project_root(params.project)
     language = tester.detect_language(root)
+    await limiter.acquire("sandbox_runs", ctx.telegram_user_id, SANDBOX_RUNS)
 
     if language == "node":
         script = f"npm install --no-audit --no-fund {params.package!r} 2>&1"
@@ -134,6 +137,7 @@ async def handle_install_dependency(params: InstallDependencyParams, ctx: Execut
 async def handle_run_project(params: RunProjectParams, ctx: ExecutionContext) -> str:
     root = project_root(params.project)
     language = tester.detect_language(root)
+    await limiter.acquire("sandbox_runs", ctx.telegram_user_id, SANDBOX_RUNS)
 
     entrypoint = params.entrypoint.strip()
     if not entrypoint:

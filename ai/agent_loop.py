@@ -7,6 +7,7 @@ from ai.prompts import SYSTEM_PROMPT, wrap_untrusted
 from ai.tools.registry import ExecutionContext, ToolRegistry
 from app.config import settings
 from security.levels import SecurityLevel
+from security.ratelimit import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,16 @@ class AgentLoop:
                 try:
                     params = spec.input_model.model_validate(block.input)
                     result_text = await spec.handler(params, ctx)
+                except RateLimitExceeded as exc:
+                    tool_results.append(
+                        _tool_error(
+                            block.id,
+                            f"Rate limit: слишком много действий этой категории. "
+                            f"Повторить можно через ~{exc.retry_after_seconds} секунд. "
+                            "Сообщи это пользователю и не повторяй вызов сразу.",
+                        )
+                    )
+                    continue
                 except Exception as exc:
                     logger.exception("Tool %s failed", block.name)
                     tool_results.append(_tool_error(block.id, str(exc)))

@@ -53,6 +53,7 @@ class _FakeSessionFactory:
 @pytest.fixture(autouse=True)
 def _workspace(tmp_path, monkeypatch):
     from app.config import settings as app_settings
+    from security.ratelimit import limiter
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -60,6 +61,7 @@ def _workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(code_tools_module, "async_session_factory", _FakeSessionFactory())
     monkeypatch.setattr(tester_tools_module, "_set_status", AsyncMock())
     fix_guard._state.clear()
+    limiter._hits.clear()
     return workspace
 
 

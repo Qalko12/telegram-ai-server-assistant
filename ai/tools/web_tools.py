@@ -83,6 +83,10 @@ async def handle_web_search(params: SearchParams, ctx: ExecutionContext) -> str:
     if provider is None:
         return "Web search не сконфигурирован: задайте TAVILY_API_KEY в .env."
 
+    from security.ratelimit import WEB_SEARCHES, limiter
+
+    await limiter.acquire("web_searches", ctx.telegram_user_id, WEB_SEARCHES)
+
     try:
         return await provider.search(params.query, params.max_results)
     except httpx.HTTPStatusError as exc:

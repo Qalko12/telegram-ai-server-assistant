@@ -193,6 +193,7 @@ async def _resolve_agent_loop_confirmation(callback: CallbackQuery, confirmation
             chat_id=confirmation.chat_id,
             telegram_user_id=confirmation.telegram_user_id,
             answer=callback.message.answer,
+            message=callback.message,
         )
 
 

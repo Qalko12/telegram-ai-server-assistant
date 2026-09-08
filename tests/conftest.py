@@ -1,8 +1,19 @@
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from database.models import Base
+
+
+@pytest.fixture(autouse=True)
+def _clear_rate_limiter():
+    """Глобальный rate limiter не должен накапливать попадания между тестами."""
+    from security.ratelimit import limiter
+
+    limiter._hits.clear()
+    yield
+    limiter._hits.clear()
 
 
 @pytest_asyncio.fixture

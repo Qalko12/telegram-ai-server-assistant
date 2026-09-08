@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from ai.tools.registry import ExecutionContext, ToolSpec
 from security.levels import SecurityLevel
+from security.ratelimit import COMMANDS, limiter
 from security.validator import validate_command
 from server.diagnostics import full_server_diagnostic
 from server.executor import CommandExecutor, CommandResult
@@ -256,12 +257,14 @@ async def handle_create_directory(params: CreateDirectoryParams, ctx: ExecutionC
 
 async def handle_execute_command(params: ExecuteCommandParams, ctx: ExecutionContext) -> str:
     validate_command(params.program, params.args)
+    await limiter.acquire("commands", ctx.telegram_user_id, COMMANDS)
     result = await CommandExecutor().run(params.program, params.args)
     return _format_command_result(result)
 
 
 async def handle_execute_shell(params: ExecuteShellParams, ctx: ExecutionContext) -> str:
     validate_command(params.command, [])
+    await limiter.acquire("commands", ctx.telegram_user_id, COMMANDS)
     result = await CommandExecutor().run("/bin/sh", ["-c", params.command])
     return _format_command_result(result)
 

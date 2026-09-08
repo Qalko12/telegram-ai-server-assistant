@@ -5,6 +5,7 @@ from aiogram.enums import ParseMode
 from app.config import settings
 from bot.handlers import callbacks, document, photo, settings as settings_handlers, start
 from bot.middlewares.auth import AuthMiddleware
+from bot.middlewares.rate_limit import RateLimitMiddleware
 
 
 def create_bot() -> Bot:
@@ -15,8 +16,11 @@ def create_dispatcher() -> Dispatcher:
     dp = Dispatcher()
 
     auth_middleware = AuthMiddleware()
+    rate_limit_middleware = RateLimitMiddleware()
     dp.message.outer_middleware(auth_middleware)
+    dp.message.outer_middleware(rate_limit_middleware)
     dp.callback_query.outer_middleware(auth_middleware)
+    dp.callback_query.outer_middleware(rate_limit_middleware)
 
     dp.include_router(callbacks.router)
     dp.include_router(settings_handlers.router)

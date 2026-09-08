@@ -8,6 +8,7 @@ from database.engine import async_session_factory
 from monitoring.alerts import AlertSender
 from monitoring.monitor import MonitorWorker
 from security.confirmations import ConfirmationService
+from security.ratelimit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ async def sweep_expired_confirmations() -> None:
 def create_scheduler(bot: Bot | None = None) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
     scheduler.add_job(sweep_expired_confirmations, "interval", seconds=CONFIRMATION_SWEEP_INTERVAL_SECONDS)
+    scheduler.add_job(limiter.prune, "interval", seconds=900, id="ratelimit_prune")
 
     alert_sender = AlertSender(bot)
     # Воркер — один на весь процесс: состояние «условие выполняется N минут» живёт между тиками.

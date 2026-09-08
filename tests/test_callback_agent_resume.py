@@ -79,7 +79,7 @@ async def test_approving_moderate_tool_resumes_and_delivers_final_answer(fake_cl
     callback = _make_callback(42, f"confirm:{confirmation.action_id}")
     await handle_confirm(callback)
 
-    callback.message.answer.assert_awaited_once_with("Готово, nginx запущен.")
+    callback.message.answer.assert_awaited_once_with("Готово, nginx запущен.", parse_mode=None)
 
     async with session_factory() as session:
         audit_rows = (await session.execute(select(AuditLog))).scalars().all()
@@ -116,7 +116,7 @@ async def test_denying_moderate_tool_resumes_with_error_result(fake_client, sess
     callback = _make_callback(42, f"cancel:{confirmation.action_id}")
     await handle_cancel(callback)
 
-    callback.message.answer.assert_awaited_once_with("Хорошо, не буду запускать.")
+    callback.message.answer.assert_awaited_once_with("Хорошо, не буду запускать.", parse_mode=None)
 
     async with session_factory() as session:
         audit_rows = (await session.execute(select(AuditLog))).scalars().all()
