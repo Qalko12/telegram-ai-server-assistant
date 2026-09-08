@@ -3,9 +3,10 @@ import io
 from aiogram import F, Router
 from aiogram.types import Message
 
-from ai.memory import append_message, load_recent_messages
+from ai.memory import append_message, build_context
 from ai.prompts import wrap_untrusted
 from ai.tools.registry import ExecutionContext
+from app.config import settings
 from app.di import agent_loop
 from bot.agent_dispatch import deliver_outcome
 from database.engine import async_session_factory
@@ -20,6 +21,11 @@ async def handle_document(message: Message) -> None:
     filename = message.document.file_name or "file"
     caption = message.caption or f"Проанализируй этот файл: {filename}"
 
+    if message.document.file_size and message.document.file_size > settings.max_file_size:
+        limit_mb = settings.max_file_size // (1024 * 1024)
+        await message.answer(f"Файл больше {limit_mb} МБ — не могу принять его целиком.")
+        return
+
     buffer = io.BytesIO()
     await message.bot.download(message.document, destination=buffer)
     content_bytes = buffer.getvalue()
@@ -33,11 +39,14 @@ async def handle_document(message: Message) -> None:
     wrapped = wrap_untrusted(f"document:{filename}", parsed_text)
 
     async with async_session_factory() as session:
-        history = await load_recent_messages(session, chat_id)
+        # В БД пишем только placeholder: содержимое документа может быть огромным
+        # и не должно раздувать историю/суммаризацию.
         await append_message(session, chat_id, "user", f"[документ {filename}] {caption}")
+        conversation = await build_context(session, chat_id)
 
-    user_text = f"{caption}\n\n{wrapped}"
-    conversation = [*history, {"role": "user", "content": user_text}]
+    # Последнее сообщение — placeholder; в текущем ходе заменяем его на caption + содержимое файла.
+    conversation[-1] = {"role": "user", "content": f"{caption}\n\n{wrapped}"}
+
     ctx = ExecutionContext(telegram_user_id=message.from_user.id, chat_id=chat_id)
 
     await message.bot.send_chat_action(chat_id, "typing")

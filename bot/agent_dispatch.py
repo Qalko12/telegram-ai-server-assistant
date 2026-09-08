@@ -1,14 +1,31 @@
 from collections.abc import Awaitable, Callable
 
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, Message
 
 from ai.agent_loop import AgentConfirmationNeeded, AgentFinalAnswer, AgentOutcome
-from ai.memory import append_message
+from ai.memory import append_message, record_user_and_build_context
+from ai.tools.registry import ExecutionContext
+from app.di import agent_loop
 from bot.keyboards.confirmation import build_confirmation_keyboard
 from database.engine import async_session_factory
 from security.confirmations import ConfirmationRequest, ConfirmationService
 
 Answer = Callable[..., Awaitable[None]]
+
+
+async def process_user_message(message: Message, user_text: str) -> None:
+    """Полный цикл текстового хода: запись в память → контекст → агент → доставка ответа."""
+    chat_id = message.chat.id
+
+    async with async_session_factory() as session:
+        conversation = await record_user_and_build_context(session, chat_id, user_text)
+
+    ctx = ExecutionContext(telegram_user_id=message.from_user.id, chat_id=chat_id)
+
+    await message.bot.send_chat_action(chat_id, "typing")
+    outcome = await agent_loop.run(conversation, ctx)
+
+    await deliver_outcome(outcome, chat_id=chat_id, telegram_user_id=message.from_user.id, answer=message.answer)
 
 
 async def deliver_outcome(outcome: AgentOutcome, *, chat_id: int, telegram_user_id: int, answer: Answer) -> None:

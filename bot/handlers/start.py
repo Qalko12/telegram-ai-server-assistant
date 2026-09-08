@@ -1,36 +1,51 @@
 from aiogram import F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
-from ai.memory import append_message, load_recent_messages
-from ai.tools.registry import ExecutionContext
-from app.di import agent_loop
-from bot.agent_dispatch import deliver_outcome
-from database.engine import async_session_factory
+from bot.agent_dispatch import process_user_message
 
 router = Router(name="start")
+
+# Команды-шорткаты из ТЗ: переводятся в естественный запрос к агенту.
+# Основной способ взаимодействия — обычный чат; команды не обязательны.
+COMMAND_PROMPTS = {
+    "server": "Проведи полную диагностику сервера и покажи краткий отчёт.",
+    "docker": "Покажи состояние Docker: контейнеры, статистику и проблемы.",
+    "logs": "Покажи последние ошибки в системных логах.",
+    "processes": "Покажи процессы, потребляющие больше всего CPU и RAM.",
+    "disk": "Покажи использование диска и что занимает больше всего места.",
+    "services": "Покажи состояние важных системных сервисов (systemd).",
+    "projects": "Покажи список проектов в Code Workspace и их статусы.",
+    "coding": (
+        "Режим разработки активен. Я опишу задачу по коду — работай в Code Workspace: "
+        "создавай/правь проекты, запускай тесты и исправляй ошибки."
+    ),
+}
 
 
 @router.message(CommandStart())
 async def handle_start(message: Message) -> None:
     await message.answer(
-        "Привет! Авторизация пройдена, я подключён к Claude AI.\n\nПиши обычным языком — что нужно сделать?"
+        "Привет! Авторизация пройдена, я подключён к Claude AI.\n\n"
+        "Пиши обычным языком — что нужно сделать?\n"
+        "/help — что я умею, /settings — настройки."
     )
+
+
+@router.message(Command("status"))
+async def handle_status(message: Message) -> None:
+    await process_user_message(message, "Кратко: статус сервера — CPU, RAM, диск, load, uptime, Docker.")
+
+
+@router.message(Command(*COMMAND_PROMPTS.keys()))
+async def handle_command_shortcut(message: Message) -> None:
+    command = message.text.split(maxsplit=1)[0].lstrip("/").split("@")[0].lower()
+    prompt = COMMAND_PROMPTS.get(command)
+    if prompt is None:
+        return
+    await process_user_message(message, prompt)
 
 
 @router.message(F.text)
 async def handle_text(message: Message) -> None:
-    chat_id = message.chat.id
-    user_text = message.text
-
-    async with async_session_factory() as session:
-        history = await load_recent_messages(session, chat_id)
-        await append_message(session, chat_id, "user", user_text)
-
-    conversation = [*history, {"role": "user", "content": user_text}]
-    ctx = ExecutionContext(telegram_user_id=message.from_user.id, chat_id=chat_id)
-
-    await message.bot.send_chat_action(chat_id, "typing")
-    outcome = await agent_loop.run(conversation, ctx)
-
-    await deliver_outcome(outcome, chat_id=chat_id, telegram_user_id=message.from_user.id, answer=message.answer)
+    await process_user_message(message, message.text)

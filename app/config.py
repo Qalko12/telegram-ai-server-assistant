@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     voice_responses_enabled: bool = Field(default=False, alias="VOICE_RESPONSES_ENABLED")
     voice_response_mode: Literal["text", "voice", "auto"] = Field(default="auto", alias="VOICE_RESPONSE_MODE")
 
+    context_token_budget: int = Field(default=24000, alias="CONTEXT_TOKEN_BUDGET")
+    history_keep_recent: int = Field(default=10, alias="HISTORY_KEEP_RECENT")
+    history_max_messages: int = Field(default=30, alias="HISTORY_MAX_MESSAGES")
+    summary_max_tokens: int = Field(default=600, alias="SUMMARY_MAX_TOKENS")
+
     max_command_timeout: int = Field(default=30, alias="MAX_COMMAND_TIMEOUT")
     max_output_size: int = Field(default=20000, alias="MAX_OUTPUT_SIZE")
     max_file_size: int = Field(default=20 * 1024 * 1024, alias="MAX_FILE_SIZE")
