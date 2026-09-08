@@ -3,7 +3,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from app.config import settings
-from bot.handlers import callbacks, start
+from bot.handlers import callbacks, document, photo, start
 from bot.middlewares.auth import AuthMiddleware
 
 
@@ -19,6 +19,8 @@ def create_dispatcher() -> Dispatcher:
     dp.callback_query.outer_middleware(auth_middleware)
 
     dp.include_router(callbacks.router)
+    dp.include_router(photo.router)
+    dp.include_router(document.router)
     dp.include_router(start.router)
 
     return dp
