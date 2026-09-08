@@ -20,6 +20,7 @@ from ai.tools.registry import ToolRegistry
 from ai.tools.deploy_tools import all_deploy_tools
 from ai.tools.git_tools import all_git_tools
 from ai.tools.tester_tools import all_tester_tools
+from ai.tools.web_tools import all_web_tools
 from ai.tools.server_tools import (
     CREATE_DIRECTORY,
     DELETE_FILE,
@@ -92,6 +93,7 @@ def build_tool_registry() -> ToolRegistry:
         *all_tester_tools(),
         *all_git_tools(),
         *all_deploy_tools(),
+        *all_web_tools(),
     ):
         registry.register(spec)
 

@@ -10,3 +10,4 @@ psutil==6.1.0
 pypdf==5.1.0
 PyYAML==6.0.2
 defusedxml==0.7.1
+httpx==0.28.1

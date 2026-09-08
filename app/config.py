@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     anthropic_api_key: str = Field(alias="ANTHROPIC_API_KEY")
+    tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
     claude_model_main: str = Field(default="claude-sonnet-4-5", alias="CLAUDE_MODEL_MAIN")
     claude_model_summary: str = Field(default="claude-haiku-4-5", alias="CLAUDE_MODEL_SUMMARY")
     allowed_telegram_ids_raw: str = Field(alias="ALLOWED_TELEGRAM_IDS")
