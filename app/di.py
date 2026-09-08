@@ -1,4 +1,5 @@
 from ai.agent_loop import AgentLoop
+from ai.tools.code_tools import all_code_tools
 from ai.tools.docker_tools import (
     DOCKER_EXEC,
     DOCKER_INSPECT,
@@ -84,6 +85,7 @@ def build_tool_registry() -> ToolRegistry:
         CREATE_MONITORING_RULE,
         DELETE_MONITORING_RULE,
         SET_MONITORING_RULE_ENABLED,
+        *all_code_tools(),
     ):
         registry.register(spec)
 
