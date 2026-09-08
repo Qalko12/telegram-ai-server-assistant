@@ -17,6 +17,7 @@ from ai.tools.monitoring_tools import (
     SET_MONITORING_RULE_ENABLED,
 )
 from ai.tools.registry import ToolRegistry
+from ai.tools.deploy_tools import all_deploy_tools
 from ai.tools.git_tools import all_git_tools
 from ai.tools.tester_tools import all_tester_tools
 from ai.tools.server_tools import (
@@ -90,6 +91,7 @@ def build_tool_registry() -> ToolRegistry:
         *all_code_tools(),
         *all_tester_tools(),
         *all_git_tools(),
+        *all_deploy_tools(),
     ):
         registry.register(spec)
 
