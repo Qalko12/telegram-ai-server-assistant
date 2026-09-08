@@ -9,6 +9,12 @@ from ai.tools.docker_tools import (
     DOCKER_STATS,
     DOCKER_STOP,
 )
+from ai.tools.monitoring_tools import (
+    CREATE_MONITORING_RULE,
+    DELETE_MONITORING_RULE,
+    LIST_MONITORING_RULES,
+    SET_MONITORING_RULE_ENABLED,
+)
 from ai.tools.registry import ToolRegistry
 from ai.tools.server_tools import (
     CREATE_DIRECTORY,
@@ -74,6 +80,10 @@ def build_tool_registry() -> ToolRegistry:
         CREATE_DIRECTORY,
         EXECUTE_COMMAND,
         EXECUTE_SHELL,
+        LIST_MONITORING_RULES,
+        CREATE_MONITORING_RULE,
+        DELETE_MONITORING_RULE,
+        SET_MONITORING_RULE_ENABLED,
     ):
         registry.register(spec)
 

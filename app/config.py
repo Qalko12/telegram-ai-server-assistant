@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     history_max_messages: int = Field(default=30, alias="HISTORY_MAX_MESSAGES")
     summary_max_tokens: int = Field(default=600, alias="SUMMARY_MAX_TOKENS")
 
+    monitor_check_interval_seconds: int = Field(default=30, alias="MONITOR_CHECK_INTERVAL_SECONDS")
+    monitor_alert_cooldown_minutes: int = Field(default=30, alias="MONITOR_ALERT_COOLDOWN_MINUTES")
+
     max_command_timeout: int = Field(default=30, alias="MAX_COMMAND_TIMEOUT")
     max_output_size: int = Field(default=20000, alias="MAX_OUTPUT_SIZE")
     max_file_size: int = Field(default=20 * 1024 * 1024, alias="MAX_FILE_SIZE")

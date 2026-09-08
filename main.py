@@ -11,7 +11,7 @@ async def main() -> None:
     bot = create_bot()
     dp = create_dispatcher()
 
-    scheduler = create_scheduler()
+    scheduler = create_scheduler(bot)
     scheduler.start()
 
     try:
