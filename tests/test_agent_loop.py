@@ -176,7 +176,10 @@ async def test_resume_after_denial_marks_tool_result_as_error(fake_client) -> No
     assert tool_result_block["is_error"] is True
 
 
-async def test_iteration_limit_is_enforced(fake_client) -> None:
+async def test_iteration_limit_is_enforced(fake_client, monkeypatch) -> None:
+    from app.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "max_agent_iterations", 15)
     tool_call = _response([_tool_use_block("call_1", "get_uptime")], stop_reason="tool_use")
     fake_client.messages.create.return_value = tool_call
 

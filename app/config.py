@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     monitor_check_interval_seconds: int = Field(default=30, alias="MONITOR_CHECK_INTERVAL_SECONDS")
     monitor_alert_cooldown_minutes: int = Field(default=30, alias="MONITOR_ALERT_COOLDOWN_MINUTES")
 
+    sandbox_image_python: str = Field(default="ai-sandbox-python:latest", alias="SANDBOX_IMAGE_PYTHON")
+    sandbox_image_node: str = Field(default="ai-sandbox-node:latest", alias="SANDBOX_IMAGE_NODE")
+    sandbox_memory_limit: str = Field(default="256m", alias="SANDBOX_MEMORY_LIMIT")
+    sandbox_cpu_limit: str = Field(default="1.0", alias="SANDBOX_CPU_LIMIT")
+    sandbox_timeout_seconds: int = Field(default=300, alias="SANDBOX_TIMEOUT_SECONDS")
+
+    max_agent_iterations: int = Field(default=30, alias="MAX_AGENT_ITERATIONS")
+
     max_command_timeout: int = Field(default=30, alias="MAX_COMMAND_TIMEOUT")
     max_output_size: int = Field(default=20000, alias="MAX_OUTPUT_SIZE")
     max_file_size: int = Field(default=20 * 1024 * 1024, alias="MAX_FILE_SIZE")

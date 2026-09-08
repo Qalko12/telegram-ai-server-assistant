@@ -10,7 +10,6 @@ from security.levels import SecurityLevel
 
 logger = logging.getLogger(__name__)
 
-MAX_AGENT_ITERATIONS = 15
 MAX_RESPONSE_TOKENS = 2048
 
 
@@ -62,7 +61,7 @@ class AgentLoop:
     async def _loop(self, conversation: list[dict[str, Any]], ctx: ExecutionContext) -> AgentOutcome:
         client = get_client()
 
-        for _ in range(MAX_AGENT_ITERATIONS):
+        for _ in range(settings.max_agent_iterations):
             response = await client.messages.create(
                 model=settings.claude_model_main,
                 max_tokens=MAX_RESPONSE_TOKENS,

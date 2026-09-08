@@ -81,6 +81,13 @@ async def _sync_project_registry(name: str, path: str) -> None:
             await session.commit()
 
 
+def _register_fix_iteration(project: str) -> None:
+    """Правка кода увеличивает счётчик циклов автофикса (общий guard с run_tests)."""
+    from ai.tools.tester_tools import fix_guard
+
+    fix_guard.on_edit(project)
+
+
 async def handle_list_projects(params: _NoParams, ctx: ExecutionContext) -> str:
     dirs = list_project_dirs()
 
@@ -135,6 +142,7 @@ async def handle_read_code_file(params: ProjectPathParams, ctx: ExecutionContext
 
 
 async def handle_write_code_file(params: WriteCodeFileParams, ctx: ExecutionContext) -> str:
+    _register_fix_iteration(params.project)
     root = project_root(params.project)
     target = resolve_inside(root, params.path)
     result = editor.write_code(target, params.content)
@@ -143,6 +151,7 @@ async def handle_write_code_file(params: WriteCodeFileParams, ctx: ExecutionCont
 
 
 async def handle_edit_code_file(params: EditCodeFileParams, ctx: ExecutionContext) -> str:
+    _register_fix_iteration(params.project)
     root = project_root(params.project)
     target = resolve_inside(root, params.path)
     result = editor.edit_code(target, params.old_string, params.new_string, replace_all=params.replace_all)
