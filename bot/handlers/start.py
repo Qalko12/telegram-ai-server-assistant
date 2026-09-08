@@ -26,7 +26,7 @@ COMMAND_PROMPTS = {
 @router.message(CommandStart())
 async def handle_start(message: Message) -> None:
     await message.answer(
-        "Привет! Авторизация пройдена, я подключён к Claude AI.\n\n"
+        "Привет! Я Алиса — технический помощник по серверу и коду.\n\n"
         "Пиши обычным языком — что нужно сделать?\n"
         "/help — что я умею, /settings — настройки."
     )

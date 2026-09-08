@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 router = Router(name="settings")
 
-HELP_TEXT = """📖 Что я умею
+HELP_TEXT = """📖 Алиса — что я умею
 
 Сервер и Docker (просто пиши по-русски):
 • «Проверь сервер» — полная диагностика

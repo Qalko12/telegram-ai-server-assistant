@@ -28,6 +28,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chmod +x /app/docker/entrypoint.sh
+# На случай CRLF-окончаний при клонировании на Windows: приводим скрипт к LF.
+RUN sed -i 's/\r$//' /app/docker/entrypoint.sh \
+    && chmod +x /app/docker/entrypoint.sh
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
