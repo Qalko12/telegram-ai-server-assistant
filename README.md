@@ -126,7 +126,7 @@ sqlite3 data/bot.db "SELECT timestamp, tool_name, success FROM audit_logs ORDER 
 
 ## Голосовые функции (STT/TTS)
 
-В v1 голосовые сообщения **не подключены** (решение в [PLAN.md](./docs/PLAN.md)): абстракции спроектированы так, что провайдер добавляется отдельным модулем без переписывания ядра. Когда решите включить — понадобятся ключ провайдера STT (например, Whisper API или Yandex SpeechKit) и TTS; настройки `VOICE_RESPONSES_ENABLED` / `VOICE_RESPONSE_MODE` уже поддержаны в конфиге.
+В v1 голосовые сообщения **не подключены** (решение в [PLAN.md](./docs/PLAN.md)): в `media/speech.py` готовы абстракции `SpeechToText` / `TextToSpeech` и `VoicePipeline` с политикой режимов (text/voice/auto). Добавление провайдера (Whisper API, Yandex SpeechKit и т.д.) — один класс + фабрика, без правок ядра. Настройки `VOICE_RESPONSES_ENABLED` / `VOICE_RESPONSE_MODE` уже поддержаны. Транскрипция голоса будет обрабатываться как недоверенный ввод (как документы и OCR).
 
 ## Web search
 
