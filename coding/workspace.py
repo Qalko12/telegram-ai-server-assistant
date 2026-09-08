@@ -70,3 +70,17 @@ def list_project_dirs() -> list[str]:
         for entry in root.iterdir()
         if entry.is_dir() and not entry.name.startswith(".")
     )
+
+
+async def set_project_status(name: str, status: str) -> None:
+    """Обновляет статус проекта в реестре (created → tests_passed → running и т.д.)."""
+    from sqlalchemy import select
+
+    from database.engine import async_session_factory
+    from database.models import Project
+
+    async with async_session_factory() as session:
+        project = (await session.execute(select(Project).where(Project.name == name))).scalar_one_or_none()
+        if project is not None:
+            project.status = status
+            await session.commit()

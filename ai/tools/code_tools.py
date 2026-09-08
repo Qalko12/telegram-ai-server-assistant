@@ -82,10 +82,15 @@ async def _sync_project_registry(name: str, path: str) -> None:
 
 
 def _register_fix_iteration(project: str) -> None:
-    """Правка кода увеличивает счётчик циклов автофикса (общий guard с run_tests)."""
+    """Правка кода увеличивает счётчик циклов автофикса (общий guard с run_tests).
+
+    Если лимит исчерпан — бросает FixLimitReachedError; agent_loop вернёт его Claude
+    как tool_result с is_error, и агент остановит автофикс и сообщит оператору (ТЗ §31).
+    """
     from ai.tools.tester_tools import fix_guard
 
     fix_guard.on_edit(project)
+    fix_guard.ensure_within_limit(project)
 
 
 async def handle_list_projects(params: _NoParams, ctx: ExecutionContext) -> str:

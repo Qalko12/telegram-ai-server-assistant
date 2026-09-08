@@ -21,11 +21,19 @@ from ai.tools.registry import ExecutionContext, ToolSpec
 from coding import tester
 from coding.fix_guard import CodeFixGuard, FixLimitReachedError
 from coding.sandbox import SandboxImageMissingError, run_in_sandbox
-from coding.workspace import project_root, resolve_inside
+from coding.workspace import project_root, resolve_inside, set_project_status
 from security.levels import SecurityLevel
 
 # Один guard на процесс: счётчики живут между tool-вызовами в рамках цикла агента.
 fix_guard = CodeFixGuard()
+
+
+async def _set_status(project: str, status: str) -> None:
+    try:
+        await set_project_status(project, status)
+    except Exception:
+        # Реестр проектов — справочная информация; его сбой не должен ронять прогон.
+        pass
 
 
 class ProjectTaskParams(BaseModel):
@@ -61,6 +69,9 @@ async def _run_task(project: str, task: str) -> str:
     # После успешного прогона тестов цикл автофикса считается завершённым.
     if task == "test" and result.success:
         fix_guard.reset(project)
+        await _set_status(project, "tests_passed")
+    if task == "build" and result.success:
+        await _set_status(project, "build_ok")
 
     remaining = fix_guard.remaining(project)
     if task == "test" and not result.success and remaining <= 1:
@@ -137,6 +148,8 @@ async def handle_run_project(params: RunProjectParams, ctx: ExecutionContext) ->
             "\n\nПриложение работало до таймаута и было остановлено вместе с контейнером. "
             "Для долгоживущих приложений используй деплой (Docker/systemd), а не run_project."
         )
+    elif result.success:
+        await _set_status(params.project, "runs_ok")
     return text
 
 
