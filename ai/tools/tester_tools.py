@@ -66,20 +66,30 @@ async def _run_task(project: str, task: str) -> str:
 
     text = tester.format_task_result(result, project, task)
 
-    # После успешного прогона тестов цикл автофикса считается завершённым.
-    if task == "test" and result.success:
-        fix_guard.reset(project)
-        await _set_status(project, "tests_passed")
+    if task == "test":
+        if result.success:
+            # Успешный прогон завершает цикл автофикса.
+            fix_guard.on_test_success(project)
+            await _set_status(project, "tests_passed")
+        else:
+            fix_guard.on_test_failure(project)
+            remaining = fix_guard.remaining(project)
+            if remaining == 0:
+                text += (
+                    "\n\n⛔ ЛИМИТ АВТОИСПРАВЛЕНИЙ ИСЧЕРПАН: "
+                    f"{fix_guard.limit} циклов правка→упавшие тесты подряд. "
+                    "Дальнейшие правки кода этого проекта заблокированы. "
+                    "Остановись и сообщи оператору, что не получилось и почему."
+                )
+            elif remaining <= 1:
+                text += (
+                    "\n\n⚠️ Приближается лимит автоисправлений "
+                    f"(осталась {remaining} попытка из {fix_guard.limit}). "
+                    "Если следующий прогон снова упадёт — автофикс будет остановлен."
+                )
     if task == "build" and result.success:
         await _set_status(project, "build_ok")
 
-    remaining = fix_guard.remaining(project)
-    if task == "test" and not result.success and remaining <= 1:
-        text += (
-            "\n\n⚠️ ЛИМИТ АВТОИСПРАВЛЕНИЙ: это последняя попытка починить тесты автоматически "
-            f"(лимит {fix_guard.limit} циклов правка→проверка). Если тесты снова упадут — "
-            "остановись и сообщи оператору, что автоматическое исправление исчерпано."
-        )
     return text
 
 

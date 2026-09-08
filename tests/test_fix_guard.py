@@ -3,62 +3,81 @@ import pytest
 from coding.fix_guard import CodeFixGuard, FixLimitReachedError
 
 
-def test_guard_counts_iterations_and_raises_after_limit() -> None:
+def test_edits_alone_do_not_count_iterations() -> None:
     guard = CodeFixGuard(limit=3)
+    guard.on_edit("proj")
+    guard.on_edit("proj")
+    guard.ensure_within_limit("proj")
+    assert guard.iterations("proj") == 0
 
-    assert guard.on_edit("proj") == 1
-    guard.ensure_within_limit("proj")
-    assert guard.on_edit("proj") == 2
-    guard.ensure_within_limit("proj")
-    assert guard.on_edit("proj") == 3
+
+def test_edit_then_failure_counts_one_cycle() -> None:
+    guard = CodeFixGuard(limit=3)
+    guard.on_edit("proj")
+    assert guard.on_test_failure("proj") == 1
+
+    # Повторный провал без новой правки — не новый цикл (тот же самый тест снова упал).
+    assert guard.on_test_failure("proj") == 1
+
+
+def test_limit_reached_blocks_edits() -> None:
+    guard = CodeFixGuard(limit=2)
+
+    guard.on_edit("proj")
+    guard.on_test_failure("proj")
     guard.ensure_within_limit("proj")
 
-    assert guard.on_edit("proj") == 4
+    guard.on_edit("proj")
+    guard.on_test_failure("proj")
+
     with pytest.raises(FixLimitReachedError) as exc_info:
         guard.ensure_within_limit("proj")
-    assert "3" in str(exc_info.value)
+    assert "2" in str(exc_info.value)
 
 
 def test_guard_is_per_project() -> None:
     guard = CodeFixGuard(limit=1)
     guard.on_edit("a")
-    guard.on_edit("a")
+    guard.on_test_failure("a")
 
     with pytest.raises(FixLimitReachedError):
         guard.ensure_within_limit("a")
-    # Другой проект не затронут.
     guard.ensure_within_limit("b")
+    guard.on_edit("b")
 
 
-def test_reset_clears_counter() -> None:
+def test_success_resets_counter() -> None:
     guard = CodeFixGuard(limit=2)
     guard.on_edit("proj")
+    guard.on_test_failure("proj")
     guard.on_edit("proj")
+    guard.on_test_failure("proj")
 
-    guard.reset("proj")
+    guard.on_test_success("proj")
 
     assert guard.iterations("proj") == 0
-    guard.on_edit("proj")
     guard.ensure_within_limit("proj")
+    guard.on_edit("proj")
 
 
 def test_remaining() -> None:
     guard = CodeFixGuard(limit=5)
     assert guard.remaining("proj") == 5
     guard.on_edit("proj")
+    guard.on_test_failure("proj")
     guard.on_edit("proj")
+    guard.on_test_failure("proj")
     assert guard.remaining("proj") == 3
 
 
 def test_stale_session_restarts_counting() -> None:
-    guard = CodeFixGuard(limit=2)
+    guard = CodeFixGuard(limit=1)
     guard.on_edit("proj")
-    guard.on_edit("proj")
+    guard.on_test_failure("proj")
 
-    # Имитируем, что последняя правка была давно.
-    guard._state["proj"].last_edit_at -= 7200
+    guard._state["proj"].last_activity -= 7200
 
-    guard.ensure_within_limit("proj")  # не бросает: сессия сброшена
+    guard.ensure_within_limit("proj")  # не бросает: сессия устарела
     assert guard.iterations("proj") == 0
 
 

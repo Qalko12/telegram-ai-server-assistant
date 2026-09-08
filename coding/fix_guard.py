@@ -1,12 +1,14 @@
-"""Ограничитель циклов автоисправления кода (ТЗ §31).
+"""Ограничитель циклов автоисправления кода (ТЗ §31, PLAN.md: «CodeFixGuard считает
+именно циклы write→test»).
 
-Сценарий: write/edit → run_tests → ERROR → analyze → edit → run_tests → ...
-Без ограничителя агент может зациклиться. CodeFixGuard считает именно циклы
-«правка → проверка» на один проект и после MAX_CODE_FIX_ITERATIONS требует
-остановиться и сообщить оператору.
+Цикл автофикса: правка кода → run_tests → ошибка → анализ → правка → run_tests → ...
+Guard считает завершённые циклы «правка → упавшие тесты». Простые правки без прогонов
+тестов счётчик не увеличивают (оператор может свободно редактировать код руками).
+После MAX_CODE_FIX_ITERATIONS неудачных циклов следующие правки блокируются —
+агент обязан остановиться и сообщить оператору. Успешный прогон тестов сбрасывает счёт.
 
-Guard живёт в памяти процесса (dict по проекту) — этого достаточно: цикл
-автоисправления происходит в рамках одной сессии агента.
+Состояние живёт в памяти процесса по проектам и устаревает через TTL (защита от
+вечной блокировки проекта после давно забытой серии неудач).
 """
 
 import time
@@ -14,14 +16,15 @@ from dataclasses import dataclass, field
 
 from app.config import settings
 
-# Состояние fix-цикла проекта сбрасывается, если правок не было дольше этого интервала.
+# Состояние fix-цикла проекта сбрасывается, если активности не было дольше этого интервала.
 FIX_SESSION_TTL_SECONDS = 3600
 
 
 @dataclass
 class FixGuardState:
-    iterations: int = 0
-    last_edit_at: float = field(default_factory=time.monotonic)
+    iterations: int = 0  # завершённые циклы «правка → упавшие тесты»
+    pending_edit: bool = False  # были правки после последнего прогона тестов
+    last_activity: float = field(default_factory=time.monotonic)
 
 
 class FixLimitReachedError(Exception):
@@ -29,8 +32,9 @@ class FixLimitReachedError(Exception):
         self.project = project
         self.limit = limit
         super().__init__(
-            f"Достигнут лимит автоматических исправлений для проекта {project!r} ({limit} циклов правка→проверка). "
-            "Нужно сообщить оператору и остановить автофикс."
+            f"Достигнут лимит автоматических исправлений для проекта {project!r}: "
+            f"{limit} циклов правка→упавшие тесты подряд. Автоматическое исправление остановлено. "
+            "Сообщи оператору, что именно не получилось, и предложи варианты дальше."
         )
 
 
@@ -43,41 +47,54 @@ class CodeFixGuard:
     def limit(self) -> int:
         return self._limit
 
-    def on_edit(self, project: str) -> int:
-        """Регистрирует правку кода. Возвращает номер итерации (1-based)."""
-        now = time.monotonic()
-        state = self._state.get(project)
-        if state is None or now - state.last_edit_at > FIX_SESSION_TTL_SECONDS:
-            state = FixGuardState(iterations=0, last_edit_at=now)
-            self._state[project] = state
-
-        state.iterations += 1
-        state.last_edit_at = now
-        return state.iterations
-
-    def ensure_within_limit(self, project: str) -> None:
-        """Бросает FixLimitReachedError, если лимит правок для проекта исчерпан."""
+    def _fresh_state(self, project: str) -> FixGuardState | None:
         state = self._state.get(project)
         if state is None:
-            return
-        now = time.monotonic()
-        if now - state.last_edit_at > FIX_SESSION_TTL_SECONDS:
-            # Цикл давно завершён — начинаем отсчёт заново.
+            return None
+        if time.monotonic() - state.last_activity > FIX_SESSION_TTL_SECONDS:
             del self._state[project]
-            return
-        if state.iterations > self._limit:
+            return None
+        return state
+
+    def on_edit(self, project: str) -> None:
+        """Регистрирует правку кода (цикл начнётся после провала тестов)."""
+        state = self._fresh_state(project) or FixGuardState()
+        state.pending_edit = True
+        state.last_activity = time.monotonic()
+        self._state[project] = state
+
+    def on_test_failure(self, project: str) -> int:
+        """Тесты упали. Если после прошлого прогона были правки — это завершённый цикл.
+
+        Возвращает текущее число циклов.
+        """
+        state = self._fresh_state(project) or FixGuardState()
+        if state.pending_edit:
+            state.iterations += 1
+            state.pending_edit = False
+        state.last_activity = time.monotonic()
+        self._state[project] = state
+        return state.iterations
+
+    def on_test_success(self, project: str) -> None:
+        """Тесты прошли — цикл автофикса завершён успешно, счётчик обнуляется."""
+        self._state.pop(project, None)
+
+    def ensure_within_limit(self, project: str) -> None:
+        """Бросает FixLimitReachedError, если лимит неудачных циклов исчерпан."""
+        state = self._fresh_state(project)
+        if state is not None and state.iterations >= self._limit:
             raise FixLimitReachedError(project, self._limit)
 
     def remaining(self, project: str) -> int:
-        state = self._state.get(project)
+        state = self._fresh_state(project)
         if state is None:
             return self._limit
         return max(0, self._limit - state.iterations)
 
     def reset(self, project: str) -> None:
-        """Сбрасывает счётчик (например, после успешного прогона тестов)."""
         self._state.pop(project, None)
 
     def iterations(self, project: str) -> int:
-        state = self._state.get(project)
+        state = self._fresh_state(project)
         return state.iterations if state is not None else 0

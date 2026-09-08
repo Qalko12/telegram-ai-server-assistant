@@ -29,6 +29,7 @@ def _workspace(tmp_path, monkeypatch):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     monkeypatch.setattr(app_settings, "code_workspace", str(workspace))
+    monkeypatch.setattr(tester_tools_module, "_set_status", AsyncMock())
     fix_guard._state.clear()
     return workspace
 
@@ -61,7 +62,8 @@ def test_detect_language_node(_workspace) -> None:
 
 async def test_run_tests_success_resets_guard(project, sandbox_mock) -> None:
     fix_guard.on_edit("proj")
-    fix_guard.on_edit("proj")
+    fix_guard.on_test_failure("proj")
+    assert fix_guard.iterations("proj") == 1
 
     result = await handle_run_tests(ProjectTaskParams(project="proj"), CTX)
 
@@ -69,17 +71,32 @@ async def test_run_tests_success_resets_guard(project, sandbox_mock) -> None:
     assert fix_guard.iterations("proj") == 0
 
 
-async def test_run_tests_failure_near_limit_warns(project, sandbox_mock) -> None:
+async def test_run_tests_failure_at_limit_warns(project, sandbox_mock, monkeypatch) -> None:
+    monkeypatch.setattr(fix_guard, "_limit", 2)
     sandbox_mock.return_value = SandboxResult(exit_code=1, stdout="1 failed", stderr="", timed_out=False)
 
-    # Лимит по умолчанию 5: набиваем 4 правки, чтобы remaining == 1.
-    for _ in range(4):
+    # Два цикла: правка → упавшие тесты.
+    for _ in range(2):
         fix_guard.on_edit("proj")
+        await handle_run_tests(ProjectTaskParams(project="proj"), CTX)
 
     result = await handle_run_tests(ProjectTaskParams(project="proj"), CTX)
 
-    assert "ЛИМИТ АВТОИСПРАВЛЕНИЙ" in result
-    assert fix_guard.iterations("proj") == 4
+    assert "ЛИМИТ АВТОИСПРАВЛЕНИЙ ИСЧЕРПАН" in result
+    assert fix_guard.iterations("proj") == 2
+
+
+async def test_run_tests_failure_near_limit_warns(project, sandbox_mock, monkeypatch) -> None:
+    monkeypatch.setattr(fix_guard, "_limit", 5)
+    sandbox_mock.return_value = SandboxResult(exit_code=1, stdout="1 failed", stderr="", timed_out=False)
+
+    for _ in range(4):
+        fix_guard.on_edit("proj")
+        await handle_run_tests(ProjectTaskParams(project="proj"), CTX)
+
+    result = await handle_run_tests(ProjectTaskParams(project="proj"), CTX)
+
+    assert "Приближается лимит" in result
 
 
 async def test_run_tests_failure_far_from_limit_no_warning(project, sandbox_mock) -> None:
@@ -88,7 +105,8 @@ async def test_run_tests_failure_far_from_limit_no_warning(project, sandbox_mock
 
     result = await handle_run_tests(ProjectTaskParams(project="proj"), CTX)
 
-    assert "ЛИМИТ АВТОИСПРАВЛЕНИЙ" not in result
+    assert "ЛИМИТ" not in result
+    assert "Приближается" not in result
 
 
 async def test_run_linter_and_formatter_and_build(project, sandbox_mock) -> None:
