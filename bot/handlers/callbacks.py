@@ -133,7 +133,11 @@ async def _resolve_agent_loop_confirmation(callback: CallbackQuery, confirmation
         snapshot=snap["snapshot"],
         pending_tool_results=snap["pending_tool_results"],
     )
-    ctx = ExecutionContext(telegram_user_id=confirmation.telegram_user_id, chat_id=confirmation.chat_id)
+    ctx = ExecutionContext(
+        telegram_user_id=confirmation.telegram_user_id,
+        chat_id=confirmation.chat_id,
+        bot=callback.bot,
+    )
 
     started_at = time.monotonic()
 

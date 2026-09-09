@@ -18,6 +18,7 @@ from ai.tools.monitoring_tools import (
 )
 from ai.tools.registry import ToolRegistry
 from ai.tools.deploy_tools import all_deploy_tools
+from ai.tools.file_send_tools import all_file_send_tools
 from ai.tools.git_tools import all_git_tools
 from ai.tools.info_tools import all_info_tools
 from ai.tools.tester_tools import all_tester_tools
@@ -96,6 +97,7 @@ def build_tool_registry() -> ToolRegistry:
         *all_deploy_tools(),
         *all_web_tools(),
         *all_info_tools(),
+        *all_file_send_tools(),
     ):
         registry.register(spec)
 

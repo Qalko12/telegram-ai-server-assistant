@@ -433,7 +433,7 @@ WRITE_FILE = ToolSpec(
     ),
     input_model=WriteFileParams,
     handler=handle_write_file,
-    security_level=SecurityLevel.MODERATE,
+    security_level=SecurityLevel.SAFE,
 )
 
 DELETE_FILE = ToolSpec(
@@ -449,7 +449,7 @@ CREATE_DIRECTORY = ToolSpec(
     description="Создать директорию (в пределах ALLOWED_PATHS).",
     input_model=CreateDirectoryParams,
     handler=handle_create_directory,
-    security_level=SecurityLevel.MODERATE,
+    security_level=SecurityLevel.SAFE,
 )
 
 EXECUTE_COMMAND = ToolSpec(

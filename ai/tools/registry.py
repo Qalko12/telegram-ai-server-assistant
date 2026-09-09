@@ -1,7 +1,8 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
+from aiogram import Bot
 from pydantic import BaseModel
 
 from security.levels import SecurityLevel
@@ -11,6 +12,7 @@ from security.levels import SecurityLevel
 class ExecutionContext:
     telegram_user_id: int
     chat_id: int
+    bot: Optional[Bot] = None  # Для отправки файлов в чат
 
 
 ToolHandler = Callable[[BaseModel, ExecutionContext], Awaitable[str]]

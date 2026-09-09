@@ -30,7 +30,11 @@ async def process_user_message(message: Message, user_text: str) -> None:
     async with async_session_factory() as session:
         conversation = await record_user_and_build_context(session, chat_id, user_text)
 
-    ctx = ExecutionContext(telegram_user_id=message.from_user.id, chat_id=chat_id)
+    ctx = ExecutionContext(
+        telegram_user_id=message.from_user.id,
+        chat_id=chat_id,
+        bot=message.bot,
+    )
 
     await message.bot.send_chat_action(chat_id, "typing")
     outcome = await agent_loop.run(conversation, ctx)

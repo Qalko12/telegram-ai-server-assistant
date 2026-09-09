@@ -33,7 +33,11 @@ async def handle_photo(message: Message) -> None:
         "content": [build_image_content_block(image_bytes), build_text_content_block(caption)],
     }
 
-    ctx = ExecutionContext(telegram_user_id=message.from_user.id, chat_id=chat_id)
+    ctx = ExecutionContext(
+        telegram_user_id=message.from_user.id,
+        chat_id=chat_id,
+        bot=message.bot,
+    )
 
     await message.bot.send_chat_action(chat_id, "typing")
     outcome = await agent_loop.run(conversation, ctx)

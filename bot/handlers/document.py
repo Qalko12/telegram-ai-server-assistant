@@ -47,7 +47,11 @@ async def handle_document(message: Message) -> None:
     # Последнее сообщение — placeholder; в текущем ходе заменяем его на caption + содержимое файла.
     conversation[-1] = {"role": "user", "content": f"{caption}\n\n{wrapped}"}
 
-    ctx = ExecutionContext(telegram_user_id=message.from_user.id, chat_id=chat_id)
+    ctx = ExecutionContext(
+        telegram_user_id=message.from_user.id,
+        chat_id=chat_id,
+        bot=message.bot,
+    )
 
     await message.bot.send_chat_action(chat_id, "typing")
     outcome = await agent_loop.run(conversation, ctx)
