@@ -47,6 +47,7 @@ from ai.tools.server_tools import (
     SEARCH_LOGS,
     START_SERVICE,
     STOP_SERVICE,
+    VALIDATE_CONFIG,
     WRITE_FILE,
 )
 
@@ -87,6 +88,7 @@ def build_tool_registry() -> ToolRegistry:
         CREATE_DIRECTORY,
         EXECUTE_COMMAND,
         EXECUTE_SHELL,
+        VALIDATE_CONFIG,
         LIST_MONITORING_RULES,
         CREATE_MONITORING_RULE,
         DELETE_MONITORING_RULE,

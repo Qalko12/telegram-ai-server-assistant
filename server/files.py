@@ -62,7 +62,7 @@ def backup_file(resolved: Path) -> Path | None:
     return backup_path
 
 
-async def write_file(path: str, content: str, validate_command: list[str] | None = None) -> str:
+async def write_file(path: str, content: str) -> str:
     resolved = ensure_path_allowed(path)
 
     if resolved.is_dir():
@@ -71,19 +71,6 @@ async def write_file(path: str, content: str, validate_command: list[str] | None
     backup_path = backup_file(resolved)
     resolved.parent.mkdir(parents=True, exist_ok=True)
     resolved.write_text(content, encoding="utf-8")
-
-    if validate_command:
-        result = await CommandExecutor().run(validate_command[0], validate_command[1:])
-        if not result.success:
-            if backup_path is not None:
-                shutil.copy2(backup_path, resolved)
-            else:
-                resolved.unlink(missing_ok=True)
-            raise ValidationFailedError(
-                f"Validation failed (exit_code={result.exit_code}): {result.stderr or result.stdout}. "
-                "Change rolled back."
-            )
-        return f"Файл записан и прошёл проверку ({' '.join(validate_command)}). Бэкап: {backup_path or 'не требовался'}."
 
     return f"Файл записан: {resolved}. Бэкап: {backup_path or 'не требовался (файл был новым)'}."
 
