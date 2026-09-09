@@ -80,8 +80,8 @@ async def _request_confirmation(
 
     text = (
         "⚠️ ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ\n\n"
-        f"Действие:\n{confirmation.tool_name}({confirmation.arguments})\n\n"
-        f"Причина:\n{confirmation.reason}\n\nВыполнить?"
+        f"Действие:\n{confirmation.tool_name}\n\n"
+        f"Аргументы:\n{confirmation.arguments}\n\nВыполнить?"
     )
     keyboard: InlineKeyboardMarkup = build_confirmation_keyboard(confirmation.action_id)
     await answer(text, reply_markup=keyboard)

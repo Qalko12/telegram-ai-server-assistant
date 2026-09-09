@@ -112,9 +112,6 @@ class ServiceControlParams(BaseModel):
 class WriteFileParams(BaseModel):
     path: str
     content: str
-    validate_command: list[str] | None = Field(
-        default=None, description="Опциональная команда для проверки файла после записи, например ['nginx', '-t']."
-    )
 
 
 class DeleteFileParams(BaseModel):
@@ -123,6 +120,23 @@ class DeleteFileParams(BaseModel):
 
 class CreateDirectoryParams(BaseModel):
     path: str
+
+
+class ValidateConfigParams(BaseModel):
+    """Проверка конфигурационных файлов через белый список валидаторов."""
+    config_type: Literal["nginx", "sshd", "sudoers", "apache", "crontab"] = Field(
+        description="Тип конфига для валидации (nginx, sshd, sudoers, apache, crontab)"
+    )
+
+
+# Белый список валидаторов: тип конфига → команда проверки
+_CONFIG_VALIDATORS = {
+    "nginx": ["nginx", "-t"],
+    "sshd": ["sshd", "-t"],
+    "sudoers": ["visudo", "-c"],
+    "apache": ["apache2ctl", "-t"],
+    "crontab": ["crontab", "-T"],
+}
 
 
 class ExecuteCommandParams(BaseModel):
@@ -244,7 +258,7 @@ async def handle_restart_service(params: ServiceControlParams, ctx: ExecutionCon
 
 
 async def handle_write_file(params: WriteFileParams, ctx: ExecutionContext) -> str:
-    return await write_file(params.path, params.content, params.validate_command)
+    return await write_file(params.path, params.content)
 
 
 async def handle_delete_file(params: DeleteFileParams, ctx: ExecutionContext) -> str:
@@ -253,6 +267,17 @@ async def handle_delete_file(params: DeleteFileParams, ctx: ExecutionContext) ->
 
 async def handle_create_directory(params: CreateDirectoryParams, ctx: ExecutionContext) -> str:
     return create_directory(params.path)
+
+
+async def handle_validate_config(params: ValidateConfigParams, ctx: ExecutionContext) -> str:
+    """Валидирует конфиг через фиксированный белый список команд."""
+    validator_cmd = _CONFIG_VALIDATORS.get(params.config_type)
+    if validator_cmd is None:
+        return f"Неизвестный тип конфига: {params.config_type}. Доступны: {', '.join(_CONFIG_VALIDATORS.keys())}"
+
+    # Команда из белого списка, никакого пользовательского ввода
+    result = await CommandExecutor().run(validator_cmd[0], validator_cmd[1:])
+    return _format_command_result(result)
 
 
 async def handle_execute_command(params: ExecuteCommandParams, ctx: ExecutionContext) -> str:
@@ -428,8 +453,8 @@ WRITE_FILE = ToolSpec(
     name="write_file",
     description=(
         "Записать содержимое в файл (в пределах ALLOWED_PATHS). Существующий файл автоматически "
-        "бэкапится перед перезаписью. Можно указать validate_command (например ['nginx','-t']) — "
-        "при неудачной проверке изменение автоматически откатывается."
+        "бэкапится перед перезаписью. Для валидации конфигов (nginx, sshd и т.д.) используй "
+        "отдельный инструмент validate_config ПОСЛЕ записи."
     ),
     input_model=WriteFileParams,
     handler=handle_write_file,
@@ -449,6 +474,18 @@ CREATE_DIRECTORY = ToolSpec(
     description="Создать директорию (в пределах ALLOWED_PATHS).",
     input_model=CreateDirectoryParams,
     handler=handle_create_directory,
+    security_level=SecurityLevel.SAFE,
+)
+
+VALIDATE_CONFIG = ToolSpec(
+    name="validate_config",
+    description=(
+        "Проверить конфигурационный файл через белый список валидаторов "
+        "(nginx -t, sshd -t, visudo -c и т.д.). Используй ПОСЛЕ write_file для проверки "
+        "отредактированных конфигов перед перезапуском сервиса."
+    ),
+    input_model=ValidateConfigParams,
+    handler=handle_validate_config,
     security_level=SecurityLevel.SAFE,
 )
 

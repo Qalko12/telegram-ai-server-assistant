@@ -62,14 +62,21 @@ class AgentLoop:
     async def _loop(self, conversation: list[dict[str, Any]], ctx: ExecutionContext) -> AgentOutcome:
         client = get_client()
 
-        for _ in range(settings.max_agent_iterations):
-            response = await client.messages.create(
-                model=settings.claude_model_main,
-                max_tokens=MAX_RESPONSE_TOKENS,
-                system=SYSTEM_PROMPT,
-                tools=self.registry.to_anthropic_tools(),
-                messages=conversation,
-            )
+        for iteration in range(settings.max_agent_iterations):
+            try:
+                response = await client.messages.create(
+                    model=settings.claude_model_main,
+                    max_tokens=MAX_RESPONSE_TOKENS,
+                    system=SYSTEM_PROMPT,
+                    tools=self.registry.to_anthropic_tools(),
+                    messages=conversation,
+                )
+            except Exception as exc:
+                logger.exception("Claude API call failed on iteration %d", iteration)
+                # Возвращаем ошибку как финальный ответ — не роняем весь ход.
+                return AgentFinalAnswer(
+                    text=f"⚠️ Ошибка API Claude: {type(exc).__name__}. Попробуй ещё раз или проверь ключ/баланс."
+                )
 
             assistant_blocks = [block.model_dump() for block in response.content]
             conversation.append({"role": "assistant", "content": assistant_blocks})
@@ -145,4 +152,10 @@ def _extract_text(content: list[Any]) -> str:
 
 
 def _tool_error(tool_use_id: str, message: str) -> dict[str, Any]:
-    return {"type": "tool_result", "tool_use_id": tool_use_id, "content": message, "is_error": True}
+    # Ошибки тоже могут содержать данные из файлов/HTTP/команд — оборачиваем в untrusted.
+    return {
+        "type": "tool_result",
+        "tool_use_id": tool_use_id,
+        "content": wrap_untrusted("error", message),
+        "is_error": True,
+    }

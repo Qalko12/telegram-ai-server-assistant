@@ -2,6 +2,7 @@ import asyncio
 from dataclasses import dataclass
 
 from app.config import settings
+from security.validator import validate_command
 
 
 @dataclass
@@ -45,6 +46,10 @@ class CommandExecutor:
     async def run(self, program: str, args: list[str] | None = None, *, cwd: str | None = None) -> CommandResult:
         args = args or []
 
+        # Deny-list проверка на КАЖДЫЙ вызов — внутри executor, а не снаружи.
+        # Это гарантирует, что ни один модуль (git, docker, sandbox и т.д.) не обойдёт защиту.
+        validate_command(program, args)
+
         try:
             process = await asyncio.create_subprocess_exec(
                 program,
@@ -70,9 +75,18 @@ class CommandExecutor:
             )
             timed_out = False
         except asyncio.TimeoutError:
-            process.kill()
-            await process.wait()
-            stdout_bytes, stdout_trunc, stderr_bytes, stderr_trunc = b"", False, b"", False
+            # Сначала мягко просим завершиться (SIGTERM), потом принудительно (SIGKILL).
+            process.terminate()
+            try:
+                await asyncio.wait_for(process.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+
+            # Читаем что успело напечататься перед таймаутом (не теряем диагностику).
+            stdout_bytes = await process.stdout.read() if process.stdout else b""
+            stderr_bytes = await process.stderr.read() if process.stderr else b""
+            stdout_trunc = stderr_trunc = False
             timed_out = True
 
         return CommandResult(

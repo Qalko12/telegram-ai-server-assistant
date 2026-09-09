@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 
 from app.config import settings
@@ -7,7 +5,6 @@ from security.permissions import PathNotAllowedError
 from server.files import (
     FileTooLargeError,
     NotAFileError,
-    ValidationFailedError,
     create_directory,
     delete_file,
     find_file,
@@ -98,23 +95,26 @@ async def test_write_file_backs_up_existing_file(tmp_path) -> None:
     assert backups[0].read_text() == "old content"
 
 
-async def test_write_file_rolls_back_on_failed_validation(tmp_path) -> None:
+async def test_write_file_simple(tmp_path) -> None:
     target = tmp_path / "config.txt"
     target.write_text("old content")
 
-    with pytest.raises(ValidationFailedError):
-        await write_file(str(target), "broken content", validate_command=[sys.executable, "-c", "import sys; sys.exit(1)"])
+    result = await write_file(str(target), "new content")
 
-    assert target.read_text() == "old content"
-
-
-async def test_write_file_keeps_change_on_successful_validation(tmp_path) -> None:
-    target = tmp_path / "config.txt"
-    target.write_text("old content")
-
-    await write_file(str(target), "new content", validate_command=[sys.executable, "-c", "import sys; sys.exit(0)"])
-
+    assert "Файл записан" in result
     assert target.read_text() == "new content"
+    backups = list((tmp_path / "_backups").glob("config.txt.*.bak"))
+    assert len(backups) == 1
+    assert backups[0].read_text() == "old content"
+
+
+async def test_write_file_creates_parent_dirs(tmp_path) -> None:
+    target = tmp_path / "subdir" / "nested" / "file.txt"
+
+    await write_file(str(target), "content")
+
+    assert target.exists()
+    assert target.read_text() == "content"
 
 
 def test_delete_file_backs_up_before_removing(tmp_path) -> None:
