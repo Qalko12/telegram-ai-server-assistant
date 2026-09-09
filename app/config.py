@@ -56,6 +56,11 @@ class Settings(BaseSettings):
 
     max_agent_iterations: int = Field(default=30, alias="MAX_AGENT_ITERATIONS")
 
+    # --- Интеграция с VPN-ботом (внутренний admin API) ---
+    # Пустой токен = инструменты VPN не регистрируются у Claude
+    vpn_admin_api_url: str = Field(default="http://172.17.0.1:8090", alias="VPN_ADMIN_API_URL")
+    vpn_admin_api_token: str = Field(default="", alias="VPN_ADMIN_API_TOKEN")
+
     max_command_timeout: int = Field(default=30, alias="MAX_COMMAND_TIMEOUT")
     max_output_size: int = Field(default=20000, alias="MAX_OUTPUT_SIZE")
     max_file_size: int = Field(default=20 * 1024 * 1024, alias="MAX_FILE_SIZE")

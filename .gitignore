@@ -10,3 +10,14 @@ venv/
 .mypy_cache/
 /data/
 /backups/
+
+# --- Скрипты деплоя и обслуживания VPS ---
+# Содержат реальные IP, токены ботов и пароли панели. ТОЛЬКО локально.
+/vpn-server/
+/deploy_*.sh
+/force_update.sh
+/check_tools.py
+
+# --- Артефакты сборки/деплоя ---
+*.tar.gz
+*.patch

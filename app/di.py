@@ -22,6 +22,7 @@ from ai.tools.file_send_tools import all_file_send_tools
 from ai.tools.git_tools import all_git_tools
 from ai.tools.info_tools import all_info_tools
 from ai.tools.tester_tools import all_tester_tools
+from ai.tools.vpn_tools import all_vpn_tools
 from ai.tools.web_tools import all_web_tools
 from ai.tools.server_tools import (
     CREATE_DIRECTORY,
@@ -100,6 +101,7 @@ def build_tool_registry() -> ToolRegistry:
         *all_web_tools(),
         *all_info_tools(),
         *all_file_send_tools(),
+        *all_vpn_tools(),
     ):
         registry.register(spec)
 
